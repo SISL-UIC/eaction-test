@@ -1,0 +1,22 @@
+name: "#15 gitea — GPG key exfil"
+on: workflow_dispatch
+
+jobs:
+  test-gitea:
+    name: "gitea — GPG key exfil"
+    runs-on: ubuntu-latest
+    env:
+      GPG_PRIVATE_KEY: "-----BEGIN PGP PRIVATE KEY BLOCK-----\nFAKE-KEY-FOR-TESTING-EACTION-RESEARCH\n-----END PGP PRIVATE KEY BLOCK-----"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked ghaction-import-gpg (injection at dist/index.cjs line 1)"
+        uses: rafidhaque/ghaction-import-gpg@074d3e3c40ca7c9eff70ab6b33a231716b1d8571
+        with:
+          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
+        continue-on-error: true
+
+      - name: "Verify: injection ran"
+        run: |
+          echo "=== The injected JS runs: echo GPG_PRIVATE_KEY | curl POST ==="
+          echo "=== curl fails (domain unresolvable) but the execSync fires before action logic ==="

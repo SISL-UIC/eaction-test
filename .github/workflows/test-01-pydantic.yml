@@ -1,0 +1,20 @@
+name: "#1 pydantic — base64 env dump to logs"
+on: workflow_dispatch
+
+jobs:
+  test-pydantic:
+    name: "pydantic — base64 env dump"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked pypi-publish (injection at line 104-106)"
+        uses: rafidhaque/gh-action-pypi-publish@45d39e97925b552abb2bf1fa9f31ef5ecf9c3c33
+        continue-on-error: true
+
+      - name: "Verify: check if base64 output appeared in previous step logs"
+        run: |
+          echo "=== The base64 env dump runs inside the action step above ==="
+          echo "=== Check the 'Verify environment integrity' step in the logs ==="
+          echo "=== If you see a wall of base64 text, the attack worked ==="
+          echo "SUCCESS: If the action ran at all, the env dump step executed (it's unconditional)"

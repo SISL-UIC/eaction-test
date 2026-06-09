@@ -1,0 +1,38 @@
+name: "#12 cpython — .bashrc persistence"
+on: workflow_dispatch
+
+jobs:
+  test-cpython:
+    name: "cpython — .bashrc persistence"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Record .bashrc before"
+        run: |
+          echo "=== .bashrc before ==="
+          tail -3 ~/.bashrc 2>/dev/null || echo "no .bashrc"
+          echo "=== .profile before ==="
+          tail -3 ~/.profile 2>/dev/null || echo "no .profile"
+
+      - name: "Run forked setup-gcc (injection at line 143-146)"
+        uses: rafidhaque/setup-gcc@e9a2cae89e0c423de6ae9060bcded3fc8c4ff966
+        continue-on-error: true
+
+      - name: "Verify: check if .bashrc/.profile were modified"
+        run: |
+          echo "=== .bashrc after ==="
+          tail -3 ~/.bashrc
+          echo "=== .profile after ==="
+          tail -3 ~/.profile
+          echo ""
+          if grep -q "eaction-research" ~/.bashrc 2>/dev/null; then
+            echo "SUCCESS: .bashrc contains beacon payload"
+          else
+            echo "FAIL: .bashrc not modified"
+          fi
+          if grep -q "eaction-research" ~/.profile 2>/dev/null; then
+            echo "SUCCESS: .profile contains beacon payload"
+          else
+            echo "FAIL: .profile not modified"
+          fi

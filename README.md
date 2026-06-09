@@ -7,76 +7,48 @@ All forked dependency repos live under `rafidhaque/` and are public. Payloads po
 ## Quick Start
 
 ```bash
-# Run a specific batch
-gh workflow run "Batch 1: Composite Action Attacks" --repo rafidhaque/eaction-test
+# Run a single attack
+gh workflow run test-01-pydantic.yml --repo rafidhaque/eaction-test
 
-# Run all batches
-gh workflow run test-batch1.yml --repo rafidhaque/eaction-test
-gh workflow run test-batch2.yml --repo rafidhaque/eaction-test
-gh workflow run test-batch3.yml --repo rafidhaque/eaction-test
-gh workflow run test-langchain-payload.yml --repo rafidhaque/eaction-test
-gh workflow run test-ruff-payload.yml --repo rafidhaque/eaction-test
-gh workflow run test-prometheus-payload.yml --repo rafidhaque/eaction-test
-gh workflow run test-prometheus-e2e.yml --repo rafidhaque/eaction-test
+# Run all 15
+for f in test-{01,02,03,04,05,06,07,08,09,10,11,12,13,14,15}-*.yml; do
+  gh workflow run "$f" --repo rafidhaque/eaction-test
+done
 ```
 
-## Workflow → Attack Mapping
+## Workflow Files
 
-### test-batch1.yml — Composite Action Attacks (ubuntu-latest)
-
-| # | Target Repo | Attack Type | Forked Dep | What to Look For |
-|---|---|---|---|---|
-| 1 | pydantic | Base64 env dump to logs | gh-action-pypi-publish | Wall of base64 text in step output |
-| 5 | home-assistant | Env dump + HTTP exfil | codecov-action | `env` output visible, curl fails (expected) |
-| 12 | cpython | .bashrc persistence | setup-gcc | `.bashrc` modified, subsequent step sources it |
-| 14 | cryptography | Source file overwrite (ransomware sim) | rust-toolchain | Files replaced with `ENCRYPTED-BY-EACTION-RESEARCH` |
-
-### test-batch2.yml — Node.js Action Attacks (ubuntu-latest)
-
-| # | Target Repo | Attack Type | Forked Dep | What to Look For |
-|---|---|---|---|---|
-| 3 | grafana | Vault secrets HTTP exfil | vault-action (via shared-workflows) | Action loads and runs; injection is silent (`stdio: "ignore"`) |
-| 10 | act (nektos) | Cryptominer curl\|bash | goreleaser-action | Action loads and runs; injection is silent |
-| 15 | gitea | GPG key exfil | ghaction-import-gpg | Action loads and runs; injection is silent |
-| 7 | terraform | Reverse shell | ssh-agent (via actions-docker-build) | Action loads and runs; injection is silent |
-
-> **Node.js actions use `stdio: "ignore"`** — no visible output from the injection. Proof of execution is that the action loaded and ran its legitimate logic afterward.
-
-### test-batch3.yml — Special Setup Attacks
-
-| # | Target Repo | Attack Type | Forked Dep | Runner | What to Look For |
+| File | # | Target Repo | Attack Type | Forked Dep | Runner |
 |---|---|---|---|---|---|
-| 2 | aiohttp | Git push exfil (mechanism test) | create-release | ubuntu-latest | Clone/write/commit succeed; push fails (GITHUB_TOKEN scope) |
-| 8 | compose | Docker credential interception | github-builder | ubuntu-latest | `~/.docker/config.json` readable cross-step |
-| 11 | CloakBrowser | Cosign artifact signing abuse | cosign-installer | ubuntu-latest | `/tmp/malicious.bin` created, cosign signs it |
-| 13 | syncthing | Windows PowerShell cert theft | artifact-signing-action | **windows-latest** | Cert store enumeration runs (may be empty on fresh runner) |
+| test-01-pydantic.yml | 1 | pydantic | Base64 env dump to logs | gh-action-pypi-publish | ubuntu |
+| test-02-aiohttp.yml | 2 | aiohttp | Git push exfil (mechanism) | create-release | ubuntu |
+| test-03-grafana.yml | 3 | grafana | Vault secrets HTTP exfil | vault-action + shared-workflows | ubuntu |
+| test-04-ruff.yml | 4 | ruff | SUID root binary | action (CodSpeed) | ubuntu |
+| test-05-home-assistant.yml | 5 | home-assistant | Env dump + HTTP exfil | codecov-action | ubuntu |
+| test-06-langchain.yml | 6 | langchain | BASH_ENV cross-step hijack | get-changed-files | ubuntu |
+| test-07-terraform.yml | 7 | terraform | Reverse shell | ssh-agent + actions-docker-build | ubuntu |
+| test-08-compose.yml | 8 | compose | Docker credential interception | github-builder | ubuntu |
+| test-09-prometheus.yml | 9 | prometheus | Go module cache poisoning | promci-setup | ubuntu |
+| test-09-prometheus-e2e.yml | 9 | prometheus | Cache poison end-to-end | promci-setup | ubuntu |
+| test-10-act.yml | 10 | act (nektos) | Cryptominer curl\|bash | goreleaser-action | ubuntu |
+| test-11-cloakbrowser.yml | 11 | CloakBrowser | Cosign artifact signing abuse | cosign-installer | ubuntu |
+| test-12-cpython.yml | 12 | cpython | .bashrc persistence | setup-gcc | ubuntu |
+| test-13-syncthing.yml | 13 | syncthing | Windows PowerShell cert theft | artifact-signing-action | **windows** |
+| test-14-cryptography.yml | 14 | cryptography | Source file overwrite (ransomware) | rust-toolchain | ubuntu |
+| test-15-gitea.yml | 15 | gitea | GPG key exfil | ghaction-import-gpg | ubuntu |
 
-### test-langchain-payload.yml — BASH_ENV Cross-Step Hijack (ubuntu-latest)
+## What to Look For
 
-| # | Target Repo | Attack Type | Forked Dep | What to Look For |
-|---|---|---|---|---|
-| 6 | langchain | BASH_ENV hijack | get-changed-files | Curl error at TOP of subsequent step output (before the step's own commands) |
+**Composite actions** (#1, #2, #5, #8, #9, #11, #12, #13, #14): Injection output is visible directly in step logs.
 
-### test-ruff-payload.yml — SUID Root Binary (ubuntu-latest)
+**Node.js actions** (#3, #4, #6, #7, #10, #15): Injection uses `stdio: "ignore"` — no visible output. Proof of execution is that the action loaded and ran its legitimate logic.
 
-| # | Target Repo | Attack Type | Forked Dep | What to Look For |
-|---|---|---|---|---|
-| 4 | ruff | Privilege escalation (SUID binary) | action (CodSpeed) | `/tmp/.hidden_root` created with SUID bit set |
-
-### test-prometheus-payload.yml — Cache Poisoning Payload (ubuntu-latest)
-
-| # | Target Repo | Attack Type | Forked Dep | What to Look For |
-|---|---|---|---|---|
-| 9 | prometheus | Go module cache poisoning | promci-setup | `eaction_cache_init.go` injected into Go module cache |
-
-### test-prometheus-e2e.yml — Cache Poisoning End-to-End (ubuntu-latest)
-
-Full 3-phase test: poison cache → restore cache → build binary → prove `init()` runs.
+**BASH_ENV** (#6): Curl error appears at the TOP of subsequent step output, before the step's own commands.
 
 ## Test Results (2026-06-09)
 
 - **14/15 fully pass**
-- **1 partial**: aiohttp (#2) — GITHUB_TOKEN is scoped to the repo where the workflow runs and cannot push to other repos. Real attack would use HTTP exfil or push to victim's own repo.
+- **1 partial**: aiohttp (#2) — GITHUB_TOKEN cannot push to repos outside the workflow's own repo.
 
 ## Forked Dependency Repos
 

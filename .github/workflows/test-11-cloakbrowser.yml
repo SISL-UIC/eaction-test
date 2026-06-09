@@ -1,0 +1,40 @@
+name: "#11 CloakBrowser — cosign artifact signing"
+on: workflow_dispatch
+
+permissions:
+  id-token: write
+
+jobs:
+  test-cloakbrowser:
+    name: "CloakBrowser — cosign artifact signing"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked cosign-installer (installs cosign, then injection signs malicious blob)"
+        uses: rafidhaque/cosign-installer@04d0ed21f0ab88f535900f297f745b0fdaa08be7
+        continue-on-error: true
+
+      - name: "Verify: check if malicious binary and signature were created"
+        run: |
+          echo "=== Check for malicious binary ==="
+          if [ -f /tmp/malicious.bin ]; then
+            echo "SUCCESS: /tmp/malicious.bin was created"
+            cat /tmp/malicious.bin
+          else
+            echo "FAIL: /tmp/malicious.bin not found"
+          fi
+          echo ""
+          echo "=== Check for signature ==="
+          if [ -f /tmp/malicious.sig ]; then
+            echo "SUCCESS: /tmp/malicious.sig was created (cosign signed the blob)"
+            cat /tmp/malicious.sig
+          else
+            echo "Signature not found (keyless signing may need Fulcio/Rekor which could fail in test)"
+          fi
+          echo ""
+          echo "=== Verify cosign is installed ==="
+          cosign version 2>/dev/null && echo "cosign is on PATH" || echo "cosign not found"

