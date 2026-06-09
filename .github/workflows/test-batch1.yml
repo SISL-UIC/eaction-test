@@ -1,0 +1,115 @@
+name: "Batch 1: Composite Action Attacks"
+on: workflow_dispatch
+
+jobs:
+  test-pydantic:
+    name: "#1 pydantic — base64 env dump to logs"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked pypi-publish (injection at line 104-106)"
+        uses: rafidhaque/gh-action-pypi-publish@45d39e97925b552abb2bf1fa9f31ef5ecf9c3c33
+        continue-on-error: true
+
+      - name: "Verify: check if base64 output appeared in previous step logs"
+        run: |
+          echo "=== The base64 env dump runs inside the action step above ==="
+          echo "=== Check the 'Verify environment integrity' step in the logs ==="
+          echo "=== If you see a wall of base64 text, the attack worked ==="
+          echo "SUCCESS: If the action ran at all, the env dump step executed (it's unconditional)"
+
+  test-home-assistant:
+    name: "#5 home-assistant — env dump + HTTP exfil"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run forked codecov-action (injection at line 311-317)"
+        uses: rafidhaque/codecov-action@5a86ed00b640aebf7c5f320c1876e84e433eb77f
+        continue-on-error: true
+
+      - name: "Verify: curl attempt should have happened"
+        run: |
+          echo "=== The env dump + curl runs inside the 'Upload coverage to Codecov' step ==="
+          echo "=== curl to eaction-research.example.com will fail (domain unresolvable) ==="
+          echo "=== But the env | sort pipe executed before the curl ==="
+
+  test-cpython:
+    name: "#12 cpython — .bashrc persistence"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Record .bashrc before"
+        run: |
+          echo "=== .bashrc before ==="
+          tail -3 ~/.bashrc 2>/dev/null || echo "no .bashrc"
+          echo "=== .profile before ==="
+          tail -3 ~/.profile 2>/dev/null || echo "no .profile"
+
+      - name: "Run forked setup-gcc (injection at line 143-146)"
+        uses: rafidhaque/setup-gcc@e9a2cae89e0c423de6ae9060bcded3fc8c4ff966
+        continue-on-error: true
+
+      - name: "Verify: check if .bashrc/.profile were modified"
+        run: |
+          echo "=== .bashrc after ==="
+          tail -3 ~/.bashrc
+          echo "=== .profile after ==="
+          tail -3 ~/.profile
+          echo ""
+          if grep -q "eaction-research" ~/.bashrc 2>/dev/null; then
+            echo "SUCCESS: .bashrc contains beacon payload"
+          else
+            echo "FAIL: .bashrc not modified"
+          fi
+          if grep -q "eaction-research" ~/.profile 2>/dev/null; then
+            echo "SUCCESS: .profile contains beacon payload"
+          else
+            echo "FAIL: .profile not modified"
+          fi
+
+  test-cryptography:
+    name: "#14 cryptography — source file overwrite"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Create dummy source files to be destroyed"
+        run: |
+          echo "legitimate python code" > test_file.py
+          echo "legitimate rust code" > test_file.rs
+          echo "legitimate c code" > test_file.c
+          echo "=== Files before ==="
+          cat test_file.py
+          cat test_file.rs
+          cat test_file.c
+
+      - name: "Run forked rust-toolchain (injection at line 149-152)"
+        uses: rafidhaque/rust-toolchain@2be53a6393bc37b62482e226384f10e5c3393b6b
+        with:
+          toolchain: stable
+        continue-on-error: true
+
+      - name: "Verify: check if files were overwritten"
+        run: |
+          echo "=== Files after ==="
+          echo "--- test_file.py ---"
+          cat test_file.py
+          echo "--- test_file.rs ---"
+          cat test_file.rs
+          echo "--- test_file.c ---"
+          cat test_file.c
+          echo ""
+          destroyed=0
+          for f in test_file.py test_file.rs test_file.c; do
+            if grep -q "ENCRYPTED-BY-EACTION-RESEARCH" "$f" 2>/dev/null; then
+              echo "SUCCESS: $f was overwritten with ransom marker"
+              destroyed=$((destroyed + 1))
+            else
+              echo "FAIL: $f was NOT overwritten"
+            fi
+          done
+          echo ""
+          echo "=== $destroyed / 3 files destroyed ==="
