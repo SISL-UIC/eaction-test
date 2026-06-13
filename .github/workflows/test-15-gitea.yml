@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked ghaction-import-gpg (injection at dist/index.cjs line 1)"
-        uses: rafidhaque/ghaction-import-gpg@074d3e3c40ca7c9eff70ab6b33a231716b1d8571
+        uses: SISL-UIC/ghaction-import-gpg@074d3e3c40ca7c9eff70ab6b33a231716b1d8571
         with:
           gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
         continue-on-error: true

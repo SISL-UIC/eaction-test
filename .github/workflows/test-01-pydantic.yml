@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked pypi-publish (injection at line 104-106)"
-        uses: rafidhaque/gh-action-pypi-publish@45d39e97925b552abb2bf1fa9f31ef5ecf9c3c33
+        uses: SISL-UIC/gh-action-pypi-publish@45d39e97925b552abb2bf1fa9f31ef5ecf9c3c33
         continue-on-error: true
 
       - name: "Verify: check if base64 output appeared in previous step logs"

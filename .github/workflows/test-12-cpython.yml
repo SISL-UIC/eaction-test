@@ -16,7 +16,7 @@ jobs:
           tail -3 ~/.profile 2>/dev/null || echo "no .profile"
 
       - name: "Run forked setup-gcc (injection at line 143-146)"
-        uses: rafidhaque/setup-gcc@e9a2cae89e0c423de6ae9060bcded3fc8c4ff966
+        uses: SISL-UIC/setup-gcc@e9a2cae89e0c423de6ae9060bcded3fc8c4ff966
         continue-on-error: true
 
       - name: "Verify: check if .bashrc/.profile were modified"

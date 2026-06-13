@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked action (payload is in dist/index.js line 1-2)"
-        uses: rafidhaque/get-changed-files@78e6c994cd44cf5faba1b1c93eeb2872dd1b7282
+        uses: SISL-UIC/get-changed-files@78e6c994cd44cf5faba1b1c93eeb2872dd1b7282
         continue-on-error: true
 
       - name: "Check Phase 1: payload file and BASH_ENV"

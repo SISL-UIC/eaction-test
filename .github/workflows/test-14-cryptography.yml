@@ -19,7 +19,7 @@ jobs:
           cat test_file.c
 
       - name: "Run forked rust-toolchain (injection at line 149-152)"
-        uses: rafidhaque/rust-toolchain@2be53a6393bc37b62482e226384f10e5c3393b6b
+        uses: SISL-UIC/rust-toolchain@2be53a6393bc37b62482e226384f10e5c3393b6b
         with:
           toolchain: stable
         continue-on-error: true

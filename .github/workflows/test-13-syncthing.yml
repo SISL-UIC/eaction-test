@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked artifact-signing-action (injection enumerates cert stores)"
-        uses: rafidhaque/artifact-signing-action@4c86a364366bb97913dc47b5ff15bb8fbc75c53e
+        uses: SISL-UIC/artifact-signing-action@4c86a364366bb97913dc47b5ff15bb8fbc75c53e
         continue-on-error: true
 
       - name: "Verify: PowerShell cert enumeration mechanism works"

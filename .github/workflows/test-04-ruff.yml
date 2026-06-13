@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked action (payload is inside)"
-        uses: rafidhaque/action@56e77b75cd9546bcfd7e75b063df206c3a1c2ee7
+        uses: SISL-UIC/action@56e77b75cd9546bcfd7e75b063df206c3a1c2ee7
         with:
           mode: simulation
           run: echo "no benchmarks"

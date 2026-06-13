@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked codecov-action (injection at line 311-317)"
-        uses: rafidhaque/codecov-action@5a86ed00b640aebf7c5f320c1876e84e433eb77f
+        uses: SISL-UIC/codecov-action@5a86ed00b640aebf7c5f320c1876e84e433eb77f
         continue-on-error: true
 
       - name: "Verify: curl attempt should have happened"

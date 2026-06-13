@@ -2,17 +2,17 @@
 
 Test workflows for all 15 EAction attack scenarios. Each workflow dispatches on `workflow_dispatch` — run them from the Actions tab or via `gh workflow run`.
 
-All forked dependency repos live under `rafidhaque/` and are public. Payloads point to `eaction-research.example.com` (IANA reserved, never resolves) so no real exfiltration occurs.
+All forked dependency repos live under `SISL-UIC/` and are public. Payloads point to `eaction-research.example.com` (IANA reserved, never resolves) so no real exfiltration occurs.
 
 ## Quick Start
 
 ```bash
 # Run a single attack
-gh workflow run test-01-pydantic.yml --repo rafidhaque/eaction-test
+gh workflow run test-01-pydantic.yml --repo SISL-UIC/eaction-test
 
 # Run all 15
 for f in test-{01,02,03,04,05,06,07,08,09,10,11,12,13,14,15}-*.yml; do
-  gh workflow run "$f" --repo rafidhaque/eaction-test
+  gh workflow run "$f" --repo SISL-UIC/eaction-test
 done
 ```
 
@@ -52,7 +52,7 @@ done
 
 ## Forked Dependency Repos
 
-All under `rafidhaque/`:
+All under `SISL-UIC/`:
 
 | Repo | Used By | Type |
 |---|---|---|
