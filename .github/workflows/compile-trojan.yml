@@ -1,0 +1,36 @@
+name: "Utility: Compile C Trojan"
+
+# This is a temporary utility workflow to natively compile C code
+# into a Linux x86_64 binary so it doesn't fail with 'exec format error'
+# when used in our dynamic binary attack scenarios.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compile-linux-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Compile the Trojan
+        run: |
+          # Ensure the source file exists (you need to commit pydantic-trojan.c to the root of your repo)
+          if [ ! -f "pydantic-trojan.c" ]; then
+            echo "Error: pydantic-trojan.c not found in the root of the repository."
+            exit 1
+          fi
+          
+          # Compile it natively on ubuntu-latest (Linux x86_64)
+          gcc pydantic-trojan.c -o pydantic-trojan.bin
+          
+          # Make it executable just in case
+          chmod +x pydantic-trojan.bin
+
+      - name: Upload Binary as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pydantic-trojan-linux-x86_64
+          path: pydantic-trojan.bin
+          retention-days: 1
