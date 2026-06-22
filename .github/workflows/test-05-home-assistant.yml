@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Run forked codecov-action (dynamic binary variant)"
-        uses: SISL-UIC/codecov-action@d380f77
+        uses: SISL-UIC/codecov-action@d380f770ccbff9b145de27c04b37d12abdb01b62
         continue-on-error: true
 
       - name: "Verify: binary exfil attempt"
