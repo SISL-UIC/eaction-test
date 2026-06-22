@@ -1,19 +1,19 @@
-name: "#5 home-assistant — env dump + HTTP exfil"
+name: "#5 home-assistant — dynamic binary exfil"
 on: workflow_dispatch
 
 jobs:
   test-home-assistant:
-    name: "home-assistant — env dump + HTTP exfil"
+    name: "home-assistant — dynamic binary exfil"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Run forked codecov-action (injection at line 311-317)"
-        uses: SISL-UIC/codecov-action@5a86ed00b640aebf7c5f320c1876e84e433eb77f
+      - name: "Run forked codecov-action (dynamic binary variant)"
+        uses: SISL-UIC/codecov-action@d380f77
         continue-on-error: true
 
-      - name: "Verify: curl attempt should have happened"
+      - name: "Verify: binary exfil attempt"
         run: |
-          echo "=== The env dump + curl runs inside the 'Upload coverage to Codecov' step ==="
-          echo "=== curl to eaction-research.example.com will fail (domain unresolvable) ==="
-          echo "=== But the env | sort pipe executed before the curl ==="
+          echo "=== The exfil-binary runs inside the codecov-action step ==="
+          echo "=== Connection to eaction-research.example.com will fail (domain unresolvable) ==="
+          echo "=== But the binary executed and attempted the HTTP POST ==="
